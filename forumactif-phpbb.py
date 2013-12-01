@@ -273,10 +273,8 @@ def get_users():
         progress = progressbar.ProgressBar(widgets=[progressbar.SimpleProgress('/'), ' ', progressbar.Bar("#","[","]"), progressbar.Percentage()], maxval=save.nbusers)
     progress.start()
     
-    #save.users = []
-    #n = 2
-
     n = len(save.users)
+    progress.update(n)
 
     ids = [i["id"] for i in save.users]
 
