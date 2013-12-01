@@ -273,13 +273,17 @@ def get_users():
         progress = progressbar.ProgressBar(widgets=[progressbar.SimpleProgress('/'), ' ', progressbar.Bar("#","[","]"), progressbar.Percentage()], maxval=save.nbusers)
     progress.start()
     
-    save.users = []
-    n = 2
+    #save.users = []
+    #n = 2
+
+    n = len(save.users)
+
+    ids = [i["id"] for i in save.users]
 
     d = PyQuery(url=config.rooturl+'/admin/index.forum?part=users_groups&sub=users&extended_admin=1&' + tid, opener=fa_opener)
 
-    if "notgetmember_pic.forum?u=" in d.text():
-        raise
+    if "notgetmember_pic.forum?u=" in d.html():
+        raise RuntimeError('Forum user page in "import protected" mode - cannot process users...')
 
     result = re.search('function do_pagination_start\(\)[^\}]*start = \(start > \d+\) \? (\d+) : start;[^\}]*start = \(start - 1\) \* (\d+);[^\}]*\}', d.text())
 
@@ -289,11 +293,13 @@ def get_users():
     except:
         pages = 1
         usersperpages = 0
+
+    currentpage = int(n/usersperpages)
         
     memberslastpage = save.nbusers % usersperpages
-    logging.debug('Utilisateurs : %d pages de %d membres', pages, usersperpages)
+    logging.debug('Utilisateurs : %d pages de %d membres - starting from page %d', pages, usersperpages, currentpage)
 
-    for page in range(0,pages):
+    for page in range(currentpage, pages):
         pageNumber = page*usersperpages
         if page == pages-1 :
             usersperpages = memberslastpage # nombre de membres sur la dernière page
@@ -328,10 +334,12 @@ def get_users():
                 else:
                     lastvisit = 0
 
-                save.users.append({'id': id, 'newid': n, 'name': e("td a").eq(0).text(), 'mail': e("td a").eq(1).text(), 'posts': int(e("td").eq(2).text()), 'date': int(date), 'lastvisit': int(lastvisit)})
-
-                n += 1
-                progress.update(n-2)
+                if id not in ids:
+                    save.users.append({'id': id, 'newid': n, 'name': e("td a").eq(0).text(), 'mail': e("td a").eq(1).text(), 'posts': int(e("td").eq(2).text()), 'date': int(date), 'lastvisit': int(lastvisit)})
+                    n += 1
+                    progress.update(n)
+                else:
+                    logging.warning('L\'utilisateur %d a déjà été récupéré.', id)
 
     progress.end()
 
