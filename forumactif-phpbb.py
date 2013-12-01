@@ -204,13 +204,14 @@ def get_topics():
     sujetdone = 0
 
     for forum in [i for i in save.forums if (i["type"] == "f" and i["parsed"] == False)]:
-	petitepause += 1
-	sujetdone += 1
+        petitepause += 1
+        sujetdone += 1
 
-	if petitepause == 50:
-	   logging.debug('Pause bien mérité')
-	   time.sleep(61)
-	   petitepause = 0
+        if petitepause == 50:
+            logging.debug('Pause bien mérité')
+            time.sleep(61)
+            petitepause = 0
+
         logging.debug('Recuperation : sujets du forum %d', forum["id"])
         logging.debug('Numéro de recup : %d', sujetdone)
         logging.debug('Nom de forum : %s', forum["title"])
@@ -219,9 +220,11 @@ def get_topics():
         time.sleep(3)
         get_connection()
         d = PyQuery(url=config.rooturl + '/' + forum['type'] + str(forum['id']) + '-a', opener=fa_opener)
-        if "Veuillez entrer votre nom d'utilisateur et votre mot de passe pour vous connecter" in d.text() :
-	    get_connection()
-	    d = PyQuery(url=config.rooturl + '/' + forum['type'] + str(forum['id']) + '-a', opener=fa_opener)
+
+        if "Veuillez entrer votre nom d'utilisateur et votre mot de passe pour vous connecter" in d.text():
+            get_connection()
+            d = PyQuery(url=config.rooturl + '/' + forum['type'] + str(forum['id']) + '-a', opener=fa_opener)
+
         result = re.search('function do_pagination_start\(\)[^\}]*start = \(start > \d+\) \? (\d+) : start;[^\}]*start = \(start - 1\) \* (\d+);[^\}]*\}', d.text())
 
         try:
@@ -234,13 +237,14 @@ def get_topics():
         for page in range(0,pages):
             if page >= 1:
                 d = PyQuery(url=config.rooturl + '/' + forum['type'] + str(forum['id']) + 'p' + str(page*topicsperpages) + '-a', opener=fa_opener)
-		    if "Veuillez entrer votre nom d'utilisateur et votre mot de passe pour vous connecter" in d.text() :
-		        get_connection()
-		        d = PyQuery(url=config.rooturl + '/' + forum['type'] + str(forum['id']) + 'p' + str(page*topicsperpages) + '-a', opener=fa_opener)
+
+            if "Veuillez entrer votre nom d'utilisateur et votre mot de passe pour vous connecter" in d.text():
+                get_connection()
+                d = PyQuery(url=config.rooturl + '/' + forum['type'] + str(forum['id']) + 'p' + str(page*topicsperpages) + '-a', opener=fa_opener)
 
             for i in d.find('div.topictitle'):
                 e = PyQuery(i)
-                
+
                 id = int(re.search("/t(\d+)-.*", e("a").attr("href")).group(1))
                 if id not in ids and id not in subids:
                     logging.debug('Récupération : sujet %d', id)
@@ -249,7 +253,7 @@ def get_topics():
                     views = int(f("td").eq(5).text())
                     subtopics.append({'id': id, 'type': e("strong").text(), 'parent': forum['newid'], 'title': e("a").text(), 'locked': locked, 'views': views, 'parsed': False})
                     subids.append(id)
-                    
+
                     n += 1
                     progress.update(n)
                 else:
@@ -274,7 +278,7 @@ def get_users():
 
     d = PyQuery(url=config.rooturl+'/admin/index.forum?part=users_groups&sub=users&extended_admin=1&' + tid, opener=fa_opener)
 
-    if "notgetmember_pic.forum?u=" in d.text() :
+    if "notgetmember_pic.forum?u=" in d.text():
         raise
 
     result = re.search('function do_pagination_start\(\)[^\}]*start = \(start > \d+\) \? (\d+) : start;[^\}]*start = \(start - 1\) \* (\d+);[^\}]*\}', d.text())
@@ -290,7 +294,7 @@ def get_users():
     logging.debug('Utilisateurs : %d pages de %d membres', pages, usersperpages)
 
     for page in range(0,pages):
-        pageNumber = page*usersperpage
+        pageNumber = page*usersperpages
         if page == pages-1 :
             usersperpages = memberslastpage # nombre de membres sur la dernière page
 
@@ -298,14 +302,15 @@ def get_users():
             time.sleep(61);
             d = PyQuery(url=config.rooturl + '/admin/index.forum?part=users_groups&sub=users&extended_admin=1&start=' + str(page*usersperpages) + '&' + tid, opener=fa_opener)
             logging.debug('Récupération membre via url: %s', config.rooturl + '/admin/index.forum?part=users_groups&sub=users&extended_admin=1&start=' + str(page*usersperpages) + '&' + tid)
-            if "notgetmember_pic.forum?u=" in d.text() :
-                raise
+
+        if ("notgetmember_pic.forum?u=" in d.html() or "Liste des Utilisateurs" not in d.text()) :
+            raise RuntimeError('Forum user page in "import proteced" mode - cannot process users...')
 
         alluserinthepage = 0
         for i in d('tbody tr'):
             if alluserinthepage == usersperpages:
-		        break
-		    e = PyQuery(i)
+                break
+            e = PyQuery(i)
             addr = e("td a").eq(0).attr("href")
             if addr != "None":
                 alluserinthepage += 1
@@ -387,15 +392,15 @@ def get_posts():
 
         loop_number = 0
         while True :
-	        if loop_number == 10 :
-		        break
-	        elif "Veuillez entrer votre nom d'utilisateur et votre mot de passe pour vous connecter" in d.text() :
-		        logging.debug('Déconnexion identifié. Tentative de reconnexion...')
-		        get_connection()
-		        d = PyQuery(url=config.rooturl + '/t' + str(topic['id']) + '-a', opener=fa_opener)
-		        loop_number += 1
-	        else :
-		        break
+            if loop_number == 10 :
+                break
+            elif "Veuillez entrer votre nom d'utilisateur et votre mot de passe pour vous connecter" in d.text():
+                logging.debug('Déconnexion identifié. Tentative de reconnexion...')
+                get_connection()
+                d = PyQuery(url=config.rooturl + '/t' + str(topic['id']) + '-a', opener=fa_opener)
+                loop_number += 1
+            else :
+                break
 
         result = re.search('function do_pagination_start\(\)[^\}]*start = \(start > \d+\) \? (\d+) : start;[^\}]*start = \(start - 1\) \* (\d+);[^\}]*\}', d.text())
 
@@ -408,7 +413,7 @@ def get_posts():
         
         logging.debug('except pour la recup du nombre de page')
         if postrecup%100 < 20 :
-	        logging.debug('Nombre de post récupéré : %d',postrecup)
+            logging.debug('Nombre de post récupéré : %d',postrecup)
             logging.debug('Nombre de page : %d',pages)
             logging.debug('Topics par page: %d', topicsperpages)
 
@@ -420,7 +425,7 @@ def get_posts():
                 while True :
                     if loop_number == 10 :
                         break
-                    elif "Veuillez entrer votre nom d'utilisateur et votre mot de passe pour vous connecter" in d.text() :
+                    elif "Veuillez entrer votre nom d'utilisateur et votre mot de passe pour vous connecter" in d.text():
                         logging.debug('Déconnexion identifié. Tentative de reconnexion...')
                         get_connection()
                         d = PyQuery(url=config.rooturl + '/a-t' + str(topic['id']) + '-' + str(page*topicsperpages) + '.htm', opener=fa_opener)
@@ -686,10 +691,11 @@ it = 1
 for forum in save.forums:
     it += 1
     if forum["description"] == None :
-    descri = ''
+        descri = ''
     else :
-    descri = forum["description"]
+        descri = forum["description"]
     sqlfile.write('INSERT INTO ' + config.table_prefix + 'forums (forum_id, parent_id, left_id, right_id, forum_name, forum_desc, forum_type) VALUES ')
+
     sqlfile.write("(" + str(forum["newid"]) + ", " + str(forum["parent"]) + ", " + str(forum["left"]) + ", " + str(forum["right"]) + ", '" + phpbb.escape_var(forum["title"]) + "', '" + phpbb.escape_var(descri) + "', " + str(int(forum["type"] == "f")) + ");\n")
 
 sqlfile.write("\n")
@@ -707,8 +713,8 @@ sqlfile.write('TRUNCATE TABLE ' + config.table_prefix + 'posts;\n\n')
 for topic in save.topics:
     subposts = [i for i in save.posts if i["topic"] == topic["id"]]
     if len(subposts) == 0 :
-	    continue
-	first_post = subposts[0]
+        continue
+    first_post = subposts[0]
     try:
         first_poster = [i for i in save.users if i["name"] == first_post["author"]][0]["newid"]
     except:
