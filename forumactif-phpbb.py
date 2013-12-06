@@ -217,7 +217,6 @@ def get_topics():
         logging.debug('Nom de forum : %s', forum["title"])
         subtopics = []
         subids = []
-        time.sleep(3)
         get_connection()
         d = PyQuery(url=config.rooturl + '/' + forum['type'] + str(forum['id']) + '-a', opener=fa_opener)
 
@@ -304,7 +303,7 @@ def get_users():
 
         if page >= 1:
             time.sleep(61);
-            d = PyQuery(url=config.rooturl + '/admin/index.forum?part=users_groups&sub=users&extended_admin=1&start=' + str(page*usersperpages) + '&' + tid, opener=fa_opener)
+            d = PyQuery(url=config.rooturl + '/admin/index.forum?part=users_groups&sub=users&extended_admin=1&start=' + pageNumber + '&' + tid, opener=fa_opener)
             logging.debug('Récupération membre via url: %s', config.rooturl + '/admin/index.forum?part=users_groups&sub=users&extended_admin=1&start=' + str(page*usersperpages) + '&' + tid)
 
         if ("notgetmember_pic.forum?u=" in d.html() or "Liste des Utilisateurs" not in d.text()) :
@@ -494,6 +493,7 @@ def set_left_right_id(forum=None, left=0):
     return curleft
     
 def get_connection():
+    time.sleep(3)
     logging.debug('Connexion en cours...')
     logging.info('Connection au forum')
     data = urlencode({'username': config.admin_name, 'password': config.admin_password, 'autologin': 1, 'redirect': '', 'login': 'Connexion'})
@@ -597,16 +597,16 @@ logging.info('Fin de la récupération')
 logging.info('Génération du fichier SQL')
 sqlfile = codecs.open('phpbb.sql', 'w+', 'utf-8')
 
-sqlfile.write('TRUNCATE TABLE ' + config.table_prefix + 'bbcodes;\n')
+sqlfile.write('DELETE FROM ' + config.table_prefix + 'bbcodes;\n')
 for bbcode in phpbb.bbcodes:
     sqlfile.write('INSERT INTO ' + config.table_prefix + 'bbcodes (bbcode_id, bbcode_tag, bbcode_helpline, display_on_posting, bbcode_match, bbcode_tpl, first_pass_match, first_pass_replace, second_pass_match, second_pass_replace) VALUES ')
     sqlfile.write(bbcode)
 
 sqlfile.write('\n')
 
-sqlfile.write('TRUNCATE TABLE ' + config.table_prefix + 'users;\n')
-sqlfile.write('TRUNCATE TABLE ' + config.table_prefix + 'user_group;\n')
-sqlfile.write('TRUNCATE TABLE ' + config.table_prefix + 'bots;\n')
+sqlfile.write('DELETE FROM ' + config.table_prefix + 'users;\n')
+sqlfile.write('DELETE FROM ' + config.table_prefix + 'user_group;\n')
+sqlfile.write('DELETE FROM ' + config.table_prefix + 'bots;\n')
 sqlfile.write('INSERT INTO ' + config.table_prefix + "users (user_id, user_type, group_id, username, username_clean, user_regdate, user_password, user_email, user_lang, user_style, user_rank, user_colour, user_posts, user_permissions, user_ip, user_birthday, user_lastpage, user_last_confirm_key, user_post_sortby_type, user_post_sortby_dir, user_topic_sortby_type, user_topic_sortby_dir, user_avatar, user_sig, user_sig_bbcode_uid, user_from, user_icq, user_aim, user_yim, user_msnm, user_jabber, user_website, user_occ, user_interests, user_actkey, user_newpasswd, user_allow_massemail) VALUES (1, 2, 1, 'Anonymous', 'anonymous', 0, '', '', 'fr', 1, 0, '', 0, '', '', '', '', '', 't', 'a', 't', 'd', '', '', '', '', '', '', '', '', '', '', '', '', '', '', 0);\n")
 sqlfile.write("INSERT INTO " + config.table_prefix + "user_group (group_id, user_id, user_pending) VALUES('1', '1', '0');\n")
 
@@ -688,7 +688,7 @@ for user in [i for i in save.users if i["name"] == config.admin_name]:
     sqlfile.write("INSERT INTO " + config.table_prefix + "user_group (group_id, user_id, user_pending, group_leader) VALUES (4, " + str(user['newid']) + ", 0, 0);\n")
     sqlfile.write("INSERT INTO " + config.table_prefix + "user_group (group_id, user_id, user_pending, group_leader) VALUES (5, " + str(user['newid']) + ", 0, 1);\n\n")
 
-sqlfile.write('TRUNCATE TABLE ' + config.table_prefix + 'forums;\n')
+sqlfile.write('DELETE FROM ' + config.table_prefix + 'forums;\n')
 sqlfile.write('DELETE FROM ' + config.table_prefix + 'acl_groups WHERE forum_id > 0;\n')
 
 set_left_right_id()
@@ -712,9 +712,9 @@ for forum in save.forums:
 
 sqlfile.write("\n")
 
-sqlfile.write('TRUNCATE TABLE ' + config.table_prefix + 'topics;\n')
-sqlfile.write('TRUNCATE TABLE ' + config.table_prefix + 'topics_posted;\n')
-sqlfile.write('TRUNCATE TABLE ' + config.table_prefix + 'posts;\n\n')
+sqlfile.write('DELETE FROM ' + config.table_prefix + 'topics;\n')
+sqlfile.write('DELETE FROM ' + config.table_prefix + 'topics_posted;\n')
+sqlfile.write('DELETE FROM ' + config.table_prefix + 'posts;\n\n')
 
 for topic in save.topics:
     subposts = [i for i in save.posts if i["topic"] == topic["id"]]
