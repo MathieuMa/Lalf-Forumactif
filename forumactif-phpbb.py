@@ -303,8 +303,8 @@ def get_users():
 
         if page >= 1:
             time.sleep(61);
-            d = PyQuery(url=config.rooturl + '/admin/index.forum?part=users_groups&sub=users&extended_admin=1&start=' + pageNumber + '&' + tid, opener=fa_opener)
-            logging.debug('Récupération membre via url: %s', config.rooturl + '/admin/index.forum?part=users_groups&sub=users&extended_admin=1&start=' + str(page*usersperpages) + '&' + tid)
+            d = PyQuery(url=config.rooturl + '/admin/index.forum?part=users_groups&sub=users&extended_admin=1&start=' + str(pageNumber) + '&' + tid, opener=fa_opener)
+            logging.debug('Récupération membre via url: %s', config.rooturl + '/admin/index.forum?part=users_groups&sub=users&extended_admin=1&start=' + str(pageNumber) + '&' + tid)
 
         if ("notgetmember_pic.forum?u=" in d.html() or "Liste des Utilisateurs" not in d.text()) :
             raise RuntimeError('Forum user page in "import proteced" mode - cannot process users...')
