@@ -70,7 +70,7 @@ try:
     logging.debug('Nombre de post sauvé : %d',len(save.posts))
 except:
     logging.debug('Pas de sauvegarde disponible : création d\'une sauvegarde vide')
-    open("save.py", "w+").close()
+    codecs.open("save.py", "w+", "utf-8").close()
     import save
     
     save.state = 0
@@ -92,6 +92,7 @@ urlopener = urllib2.build_opener(urllib2.HTTPCookieProcessor(cookiejar))
 month = {u'Jan' : 1,
          u'Fév' : 2,
          u'F\xc3\xa9v' : 2,
+         u'F\u0102\u0160v' : 2,
          u'Mar' : 3,
          u'Avr' : 4,
          u'Mai' : 5,
@@ -99,11 +100,13 @@ month = {u'Jan' : 1,
          u'Juil' : 7,
          u'Aoû' : 8,
          u'Ao\xc3\xbb' : 8,
+         u'Ao\u0102\u0165' : 8,
          u'Sep' : 9,
          u'Oct' : 10,
          u'Nov' : 11,
          u'Déc' : 12,
-         u'D\xc3\xa9c' : 12}
+         u'D\xc3\xa9c' : 12,
+         u'D\u0102\u0160c' : 12}
 
 def topic_type(topic_type):
     if topic_type == None:
@@ -121,16 +124,23 @@ def fa_opener(url):
     global urlopener
     request = urllib2.Request(url)
     request.add_header('User-Agent', 'Mozilla/5.0 (X11; Linux i686; rv:6.0.1) Gecko/20100101 Firefox/6.0.1')
+    try:
     resp = urlopener.open(request)
+    except:
+        logging.debug('CONNECTION ERROR : trying to reconnect after 30s pause')
+        time.sleep(30)
+        return fa_opener(url)
     if "charset" in resp.headers['content-type']:
         encoding = resp.headers['content-type'].split('charset=')[-1]
     else:
-        encoding = "latin1"
+        encoding = "utf-8"
     data = resp.read()
     try:
-        return unicode(data, encoding)
+        return unicode(data, encoding, 'replace')
     except UnicodeDecodeError:
-        return unicode(data, chardet.detect(data)['encoding'])
+        logging.debug('Unicode Decode Error '+chardet.detect(data)['encoding'])
+        return unicode(data, "latin-1")
+        #return unicode(data, chardet.detect(data)['encoding'])
 
 def get_stats():
     logging.info('Récupération des statistiques')
@@ -187,6 +197,9 @@ def get_forums():
         
         save.forums.append({'id': int(id[1:]), 'newid': n, 'type': id[0], 'parent': parent, 'title': title, 'description': description, 'parsed': False})
         n += 1
+        time.sleep(0.5)
+        if n == 3:
+            break
 
 def get_topics():
     logging.info('Récupération des sujets')
@@ -207,16 +220,12 @@ def get_topics():
         petitepause += 1
         sujetdone += 1
 
-        if petitepause == 50:
-            logging.debug('Pause bien mérité')
-            time.sleep(61)
-            petitepause = 0
-
         logging.debug('Recuperation : sujets du forum %d', forum["id"])
         logging.debug('Numéro de recup : %d', sujetdone)
         logging.debug('Nom de forum : %s', forum["title"])
         subtopics = []
         subids = []
+        time.sleep(3)
         get_connection()
         d = PyQuery(url=config.rooturl + '/' + forum['type'] + str(forum['id']) + '-a', opener=fa_opener)
 
@@ -243,14 +252,15 @@ def get_topics():
 
             for i in d.find('div.topictitle'):
                 e = PyQuery(i)
-
+                
+                title = e("a").text()
                 id = int(re.search("/t(\d+)-.*", e("a").attr("href")).group(1))
                 if id not in ids and id not in subids:
                     logging.debug('Récupération : sujet %d', id)
                     f = e.parents().eq(-2)
                     locked = u"verrouillé" in f("td img").eq(0).attr("alt")
                     views = int(f("td").eq(5).text())
-                    subtopics.append({'id': id, 'type': e("strong").text(), 'parent': forum['newid'], 'title': e("a").text(), 'locked': locked, 'views': views, 'parsed': False})
+                    subtopics.append({'id': id, 'type': e("strong").text(), 'parent': forum['newid'], 'title': title, 'locked': locked, 'views': views, 'parsed': False})
                     subids.append(id)
 
                     n += 1
@@ -332,6 +342,7 @@ def get_users():
                     lastvisit = 0
 
                 if id not in ids:
+                    name = e("td a").eq(0).text()
                     save.users.append({'id': id, 'newid': n, 'name': e("td a").eq(0).text(), 'mail': e("td a").eq(1).text(), 'posts': int(e("td").eq(2).text()), 'date': int(date), 'lastvisit': int(lastvisit)})
                     n += 1
                     progress.update(n)
@@ -390,6 +401,7 @@ def get_posts():
     ids = [i["id"] for i in save.posts]
     
     for topic in [i for i in save.topics if i["parsed"] == False]:
+        logging.debug('%d / %d (%3.2f%%)',len(save.posts), save.nbposts, (len(save.posts)/float(save.nbposts))*100.0)
         logging.debug('Récupération : messages du topic %d', topic["id"])
         subposts = []
         subids = []
@@ -416,7 +428,6 @@ def get_posts():
             pages = 1
             topicsperpages = 0
         
-        logging.debug('except pour la recup du nombre de page')
         if postrecup%100 < 20 :
             logging.debug('Nombre de post récupéré : %d',postrecup)
             logging.debug('Nombre de page : %d',pages)
@@ -424,6 +435,8 @@ def get_posts():
 
         for page in range(0,pages):
             logging.debug('Analyse de la page : %d',page)
+            if pages>=10:
+                time.sleep(2)
             if page >= 1:
                 d = PyQuery(url=config.rooturl + '/a-t' + str(topic['id']) + '-' + str(page*topicsperpages) + '.htm', opener=fa_opener)
                 loop_number = 0
@@ -441,7 +454,6 @@ def get_posts():
             nbrpost = 0
 
             for i in d.find('tr.post'):
-                logging.debug('post : %d', nbrpost)
                 nbrpost += 1
                 e = PyQuery(i)
                 
@@ -452,17 +464,31 @@ def get_posts():
                     post = htmltobbcode.htmltobbcode(e("td div.postbody div").eq(0).html(), save.smileys)
                     result = e("table td span.postdetails").text().split(" ")
                     if result[-3] == "Aujourd'hui":
-                        title = " ".join(e("table td span.postdetails").text().split(" ")[1:-3])
+                        #title = " ".join(e("table td span.postdetails").text().split(" ")[1:-3])
+                        title = e("table td span.postdetails").text()
+                        title = re.split(r'\s(?=(?:Lun|Mar|Mer|Jeu|Ven|Sam|Dim|Hier|Aujourd\'hui)\b)', title)[0]
+                        title = title[7:]
                         date = e("table td span.postdetails").text().split(" ")[-3:]
                         timestamp = time.mktime(datetime.datetime.combine(datetime.date.today(), datetime.time(int(date[2].split(":")[0]),int(date[2].split(":")[1]))).timetuple())
                     elif result[-3] == "Hier":
-                        title = " ".join(e("table td span.postdetails").text().split(" ")[1:-3])
+                        #title = " ".join(e("table td span.postdetails").text().split(" ")[1:-3])
+                        title = e("table td span.postdetails").text()
+                        title = re.split(r'\s(?=(?:Lun|Mar|Mer|Jeu|Ven|Sam|Dim|Hier|Aujourd\'hui)\b)', title)[0]
+                        title = title[7:]
                         date = e("table td span.postdetails").text().split(" ")[-3:]
                         timestamp = time.mktime(datetime.datetime.combine(datetime.date.today()-datetime.timedelta(1), datetime.time(int(date[2].split(":")[0]),int(date[2].split(":")[1]))).timetuple())
                     else:
-                        title = " ".join(e("table td span.postdetails").text().split(" ")[1:-6])
+                        #title = " ".join(e("table td span.postdetails").text().split(" ")[1:-6])
+                        title = e("table td span.postdetails").text()
+                        title = re.split(r'\s(?=(?:Lun|Mar|Mer|Jeu|Ven|Sam|Dim|Hier|Aujourd\'hui)\b)', title)[0]
+                        title = title[7:]
                         date = e("table td span.postdetails").text().split(" ")[-6:]
-                        timestamp = time.mktime(datetime.datetime(int(date[3]),month[date[2]],int(date[1]),int(date[5].split(":")[0]),int(date[5].split(":")[1])).timetuple())
+                        #timestamp = time.mktime(datetime.datetime(int(date[3]),month[date[2]],int(date[1]),int(date[5].split(":")[0]),int(date[5].split(":")[1])).timetuple())
+                        if month[date[3]] == 2:
+                            if int(date[2]) > 28:
+                                date[2] = u'28'
+                        timestamp = time.mktime(datetime.datetime(int(2013),month[date[3]],int(date[2]),int(date[5].split(":")[0]),int(date[5].split(":")[1])).
+timetuple())
                     
                     subposts.append({'id': id, 'post': post, 'title': title, 'topic': topic["id"], 'timestamp': int(timestamp), 'author': author})
                     subids.append(id)
@@ -493,7 +519,7 @@ def set_left_right_id(forum=None, left=0):
     return curleft
     
 def get_connection():
-    time.sleep(3)
+    time.sleep(2)
     logging.debug('Connexion en cours...')
     logging.info('Connection au forum')
     data = urlencode({'username': config.admin_name, 'password': config.admin_password, 'autologin': 1, 'redirect': '', 'login': 'Connexion'})
@@ -546,7 +572,7 @@ except:
     logging.exception('Une erreur s\'est produite. Essayez de relancer le script. Pour plus d\'informations, consultez le fichier debug.log.')
     
     logging.info('Sauvegarde de la progression')
-    savefile = open("save.py", "w+")
+    savefile = codecs.open('save.py', 'w+', 'utf-8')
     savefile.write("# -*- coding: utf-8 -*-\n\n")
     
     savefile.write("state = " + str(save.state) + "\n\n")
@@ -570,7 +596,7 @@ except:
     sys.exit(1)
 
 logging.debug('Sauvegarde de la progression')
-savefile = open("save.py", "w+")
+savefile = codecs.open('save.py', 'w+', 'utf-8')
 savefile.write("# -*- coding: utf-8 -*-\n\n")
 
 savefile.write("state = " + str(save.state) + "\n\n")
@@ -607,14 +633,15 @@ sqlfile.write('\n')
 sqlfile.write('DELETE FROM ' + config.table_prefix + 'users;\n')
 sqlfile.write('DELETE FROM ' + config.table_prefix + 'user_group;\n')
 sqlfile.write('DELETE FROM ' + config.table_prefix + 'bots;\n')
-sqlfile.write('INSERT INTO ' + config.table_prefix + "users (user_id, user_type, group_id, username, username_clean, user_regdate, user_password, user_email, user_lang, user_style, user_rank, user_colour, user_posts, user_permissions, user_ip, user_birthday, user_lastpage, user_last_confirm_key, user_post_sortby_type, user_post_sortby_dir, user_topic_sortby_type, user_topic_sortby_dir, user_avatar, user_sig, user_sig_bbcode_uid, user_from, user_icq, user_aim, user_yim, user_msnm, user_jabber, user_website, user_occ, user_interests, user_actkey, user_newpasswd, user_allow_massemail) VALUES (1, 2, 1, 'Anonymous', 'anonymous', 0, '', '', 'fr', 1, 0, '', 0, '', '', '', '', '', 't', 'a', 't', 'd', '', '', '', '', '', '', '', '', '', '', '', '', '', '', 0);\n")
+#sqlfile.write('INSERT INTO ' + config.table_prefix + "users (user_id, user_type, group_id, username, username_clean, user_regdate, user_password, user_email, user_lang, user_style, user_rank, user_colour, user_posts, user_permissions, user_ip, user_birthday, user_lastpage, user_last_confirm_key, user_post_sortby_type, user_post_sortby_dir, user_topic_sortby_type, user_topic_sortby_dir, user_avatar, user_sig, user_sig_bbcode_uid, user_from, user_icq, user_aim, user_yim, user_msnm, user_jabber, user_website, user_occ, user_interests, user_actkey, user_newpasswd, user_allow_massemail) VALUES (1, 2, 1, 'Anonymous', 'anonymous', 0, '', '', 'fr', 1, 0, '', 0, '', '', '', '', '', 't', 'a', 't', 'd', '', '', '', '', '', '', '', '', '', '', '', '', '', '', 0);\n")
 sqlfile.write("INSERT INTO " + config.table_prefix + "user_group (group_id, user_id, user_pending) VALUES('1', '1', '0');\n")
 
 for user in save.users:
     if user["name"] == config.admin_name:
         password = md5(config.admin_password).hexdigest()
     else:
-        password = md5(''.join(random.choice(letters + digits) for i in xrange(8))).hexdigest()
+        #password = md5(''.join(random.choice(letters + digits) for i in xrange(8))).hexdigest()
+        password = md5('').hexdigest()
     
     data = [str(user["newid"]),                         #user_id
     user["name"] == config.admin_name and "3" or "0",   #user_type
@@ -778,7 +805,7 @@ for post in save.posts:
     bbcode_uid = ''.join([random.choice('abcdefghijklmnopqrstuvwxyz0123456789') for i in xrange(8)])
     bbcode_bitfield = phpbb.makebitfield(post["post"]).strip()
     post["post"] = post["post"].replace(":<UID>]",":" + bbcode_uid + "]")
-    checksum = md5(post["post"].encode("utf-8")).hexdigest()
+    checksum = md5(post["post"].encode("utf8")).hexdigest()
     
     data = [str(post["id"]),                        #post_id
     str(post["topic"]),                             #topic_id
