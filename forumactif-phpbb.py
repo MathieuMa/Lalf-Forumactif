@@ -125,7 +125,7 @@ def fa_opener(url):
     request = urllib2.Request(url)
     request.add_header('User-Agent', 'Mozilla/5.0 (X11; Linux i686; rv:6.0.1) Gecko/20100101 Firefox/6.0.1')
     try:
-    resp = urlopener.open(request)
+        resp = urlopener.open(request)
     except:
         logging.debug('CONNECTION ERROR : trying to reconnect after 30s pause')
         time.sleep(30)
