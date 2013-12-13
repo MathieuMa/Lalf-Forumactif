@@ -198,8 +198,6 @@ def get_forums():
         save.forums.append({'id': int(id[1:]), 'newid': n, 'type': id[0], 'parent': parent, 'title': title, 'description': description, 'parsed': False})
         n += 1
         time.sleep(0.5)
-        if n == 3:
-            break
 
 def get_topics():
     logging.info('Récupération des sujets')
